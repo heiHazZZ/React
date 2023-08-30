@@ -97,57 +97,106 @@ const tabs = [
  */
 
 const Bili = () => {
-  // tab高亮
+  // 导航 Tab 高亮的状态
   const [activeTab, setActiveTab] = useState("hot");
-  // tab高亮切换
-  const onTotal = (type) => {
-    setActiveTab(type);
-    let newList;
-    if (type === "time") {
-      newList = orderBy(list, "ctime", "desc");
-    } else {
-      newList = orderBy(list, "like", "desc");
-    }
-    setList(newList);
-  };
   const [list, setList] = useState(defaultList);
-  // 删除
-  const onDelete = (id) => {
-    // 删除数组元素用filter方法
-    setList(list.filter((item) => item.rpid !== id));
+
+  // 评论框的状态
+  const [value, setValue] = useState("");
+
+  // 评论框的 ref 对象
+  const textRef = useRef(null);
+
+  const onAdd = () => {
+    // 判断评论框内容是否为空
+    if (value.trim() === "") {
+      return textRef.current.focus();
+    }
+
+    // 组装评论数据
+    const comment = {
+      rpid: Date.now(),
+      user,
+      content: value,
+      ctime: dayjs().format("MM-DD HH:mm"),
+      like: 0,
+      action: 0,
+    };
+
+    // 添加到评论列表 list 状态中
+    const newList = [comment, ...list];
+
+    // 排序
+    if (activeTab === "time") {
+      // 最新
+      // 更新状态
+      setList(orderBy(newList, "ctime", "desc"));
+    } else {
+      // 最热
+      setList(orderBy(newList, "like", "desc"));
+    }
+
+    // 清空评论框的内容
+    setValue("");
   };
+
+  // 删除评论
+  const onDelete = (rpid) => {
+    // 如果要删除数组中的元素，需要调用 filter 方法，并且一定要调用 setList 才能更新状态
+    setList(list.filter((item) => item.rpid !== rpid));
+  };
+
   // 喜欢
-  const onLike = (id) => {
+  const onLike = (rpid) => {
     setList(
       list.map((item) => {
-        if (item.rpid === id) {
+        if (item.rpid === rpid) {
           return {
             ...item,
-            // 背景色
+            // 高亮 action
             action: item.action === 1 ? 0 : 1,
-            // 数量
+            // 喜欢数量 like
             like: item.action === 1 ? item.like - 1 : item.like + 1,
           };
         }
+        return item;
       })
     );
   };
 
   // 不喜欢
-  const onDislike = (id) => {
+  const onDislike = (rpid) => {
     setList(
       list.map((item) => {
-        if (item.rpid === id) {
+        if (item.rpid === rpid) {
           return {
             ...item,
-            // 背景色
+            // 高亮 action
             action: item.action === 2 ? 0 : 2,
-            // 数量
+            // 喜欢数量 like
+            // 判断当前是否喜欢，如果喜欢，就让数量 - 1；如果没有喜欢，数量不变
             like: item.action === 1 ? item.like - 1 : item.like,
           };
         }
+        return item;
       })
     );
+  };
+
+  // tab 高亮切换
+  const onToggle = (type) => {
+    setActiveTab(type);
+
+    let newList;
+    if (type === "time") {
+      // 按照时间降序排序
+      // orderBy(对谁进行排序, 按照谁来排, 顺序)
+      newList = orderBy(list, "ctime", "desc");
+    } else {
+      // 按照喜欢数量降序排序
+      newList = orderBy(list, "like", "desc");
+    }
+    setList(newList);
   };
 
   return (
@@ -166,13 +215,13 @@ const Bili = () => {
               return (
                 <div
                   key={item.type}
-                  className={
-                    item.type === activeTab ? "nav-item active" : "nav-item"
-                  }
-                  onClick={onTotal(item.type)}
+                  className={classNames(
+                    "nav-item",
+                    item.type === activeTab && "active"
+                  )}
+                  onClick={() => onToggle(item.type)}
                 >
-                  {" "}
-                  {item.text}{" "}
+                  {item.text}
                 </div>
               );
             })}
@@ -194,12 +243,12 @@ const Bili = () => {
             <textarea
               className="reply-box-textarea"
               placeholder="发一条友善的评论"
-              // value={value}
-              // onChange={(e) => setValue(e.target.value)}
-              // ref={textRef}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              ref={textRef}
             />
             {/* 发布按钮 */}
-            <div className="reply-box-send" >
+            <div className="reply-box-send" onClick={onAdd}>
               <div className="send-text">发布</div>
             </div>
           </div>
@@ -220,51 +269,57 @@ const Bili = () => {
                     />
                   </div>
                 </div>
-                <div className="content-warp">
+
+                <div className="content-wrap">
                   {/* 用户名 */}
                   <div className="user-info">
                     <div className="user-name">{item.user.uname}</div>
                   </div>
                   {/* 评论内容 */}
                   <div className="root-reply">
-                    <div className="reply-content">{item.content}</div>
+                    <span className="reply-content">{item.content}</span>
+                    <div className="reply-info">
+                      {/* 评论时间 */}
+                      <span className="reply-time">{item.ctime}</span>
+                      {/* 喜欢 */}
+                      <span className="reply-like">
+                        {/* 选中类名： liked */}
+                        <i
+                          className={classNames(
+                            "icon like-icon",
+                            item.action === 1 && "liked"
+                          )}
+                          onClick={() => onLike(item.rpid)}
+                        />
+                        <span>{item.like}</span>
+                      </span>
+                      {/* 不喜欢 */}
+                      <span className="reply-dislike">
+                        {/* 选中类名： disliked */}
+                        <i
+                          className={classNames(
+                            "icon dislike-icon",
+                            item.action === 2 && "disliked"
+                          )}
+                          onClick={() => onDislike(item.rpid)}
+                        />
+                      </span>
+                      {user.uid === item.user.uid && (
+                        <span
+                          className="delete-btn"
+                          onClick={() => onDelete(item.rpid)}
+                        >
+                          删除
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {/* 评论时间 */}
-                  <div className="reply-time">{item.ctime}</div>
-                  {/* 喜欢 */}
-                  <span className="reply-like">
-                    <i
-                      className={
-                        item.action === 1
-                          ? "icon like-icon liked"
-                          : "icon like-icon"
-                      }
-                      onClick={onLike(item.rpid)}
-                    ></i>
-                    <span>{item.like}</span>
-                  </span>
-                  {/* 不喜欢 */}
-                  <span className="reply-dislike">
-                    <i
-                      className={
-                        item.action === 2
-                          ? "icon dislike-icon disliked"
-                          : "icon dislike-icon "
-                      }
-                      onClick={onDislike(item.rpid)}
-                    ></i>
-                  </span>
-                  {user.uid === list.user.uid && (
-                    <span className="delete-btn" onClick={onDelete(item.rpid)}>
-                      删除
-                    </span>
-                  )}
                 </div>
               </div>
             );
           })}
         </div>
-        {list.length === 0 && <div className="reply-none">暂无评论</div>}
+        {list.length === 0 && <div className="reply-none">暂无评论</div>}{" "}
       </div>
     </div>
   );
